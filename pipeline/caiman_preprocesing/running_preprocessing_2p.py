@@ -43,7 +43,7 @@ for i in range(1):
 
 selected_rows = db.select(states, mouse = mouse, year = year,month=month,date = date, analysis_version = [1,0,0,0,0])
 
-### general dictionary for motion correction
+### general dictionary for motion correction 
 parameters_motion_correction = {'pw_rigid': True, 'save_movie_rig': False,
                                 'gSig_filt': (5, 5), 'max_shifts': (5, 5), 'niter_rig': 1,
                                 'strides': (48, 48),
