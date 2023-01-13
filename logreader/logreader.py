@@ -4,7 +4,7 @@ import struct
 from cobs import cobs
 from pathlib import Path
 import matplotlib.pyplot as plt
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 import scipy.signal
 from scipy.io import savemat
 import rawpy
@@ -30,8 +30,9 @@ def read_ScanImageTiffHeader(file_path):
 
     with ScanImageTiffReader(file_path) as reader:
         time = reader.shape()[0]
-        for frame in range(time):
+        for frame in range(30):
             x = reader.description(frame)
+            #print(x)
             description = x.split('\n')
             frameTs.append(float(description[3].split('=')[1]))
             i2c = description[14].split('=')
@@ -137,3 +138,7 @@ def create_bp_structure(bp):
                "startTS": data['us_start'], "transmitTS": data['us_end'], "longVar": data['states'], "packetNums": data['packetID']}
 
     return decoded
+
+
+def find_sync_shift():
+    pass
