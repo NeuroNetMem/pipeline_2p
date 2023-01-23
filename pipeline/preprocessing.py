@@ -159,7 +159,7 @@ cnm = cnm.fit(images)
 
 print('Savign CNMF object')
 filehandler = open(output_path+'/cnmf.pickle', 'wb') 
-pickle.dump(cnm.estimates, filehandler)
+pickle.dump(cnm, filehandler)
 filehandler.close()
 
 

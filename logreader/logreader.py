@@ -3,7 +3,6 @@ import base64
 import struct
 from cobs import cobs
 from tqdm.notebook import tqdm
-import rawpy
 from collections import namedtuple
 from ScanImageTiffReader import  ScanImageTiffReader
 
