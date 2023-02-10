@@ -9,7 +9,7 @@ import utils.utils as ut
 
 
 xls_info_file = '/ceph/imaging1/arie/fileinfo.xlsx'
-animals = ['croc','tom'] #animals to analize
+animals = ['toms'] #animals to analize
 output_path = '/ceph/imaging1/davide/2p_data/data_quality'
 saturation_th = - 100
 log_file = output_path + '/log.txt'

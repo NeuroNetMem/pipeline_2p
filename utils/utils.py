@@ -9,6 +9,7 @@ def make_tif_list(xls_file,animal_names):
 
     for animal in animal_names:
         subset = data[data['name']==animal]
+        print (f'{len(subset)} files found for mouse: {animal}')
         for i in range(len(subset)):
             animal_num = subset['mouse'].iloc[i]
             year = subset['year'].iloc[i]
