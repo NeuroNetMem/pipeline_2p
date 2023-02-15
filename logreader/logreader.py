@@ -5,6 +5,7 @@ from cobs import cobs
 from tqdm.notebook import tqdm
 from collections import namedtuple
 from ScanImageTiffReader import  ScanImageTiffReader
+import pandas as pd
 
 
 def read_ScanImageTiffHeader(file_path):
@@ -106,6 +107,76 @@ def create_bp_structure(bp):
 
     return decoded
 
+def decode_logfile(logfile):
+    print('Decoding log file')
+    
+    digital_in_labels = [] #labels for digital input channels
+    digital_out_labels = [] #labels for digital output channels
+    analog_labels = [] #labels for analog channels
+    
+    # Format package
+    DataPacketDesc = {'type': 'B',
+                      'size': 'B',
+                      'crc16': 'H',
+                      'packetID': 'I',
+                      'us_start': 'I',
+                      'us_end': 'I',
+                      'analog': '8H',
+                      'states': '8l',
+                      'digitalIn': 'H',
+                      'digitalOut': 'B',
+                      'padding': 'x'}
+
+    DataPacket = namedtuple('DataPacket', DataPacketDesc.keys())
+    DataPacketStruct = '<' + ''.join(DataPacketDesc.values())
+    DataPacketSize = struct.calcsize(DataPacketStruct)
+
+    # package with non-digital data
+    dtype_no_digital = [
+        ('type', np.uint8),
+        ('size', np.uint8),
+        ('crc16', np.uint16),
+        ('packetID', np.uint32),
+        ('us_start', np.uint32),
+        ('us_end', np.uint32),
+        ('analog', np.uint16, (8, )),
+        ('states', np.uint32, (8, ))]
+
+    # DigitalIn and DigitalOut
+    dtype_w_digital = dtype_no_digital + [('digital_in', np.uint16, (16, )), ('digital_out', np.uint8, (8, ))]
+
+    # Creating array with all the data (differenciation digital/non digital)
+    np_DataPacketType_noDigital = np.dtype(dtype_no_digital)
+    np_DataPacketType_withDigital = np.dtype(dtype_w_digital)
+    # Unpack the data as done on the teensy commander code
+    num_lines = count_lines(logfile)
+    log_duration = num_lines/1000/60
+
+    # Decode and create new dataset
+    data = np.zeros(num_lines, dtype=np_DataPacketType_withDigital)
+    non_digital_names = list(np_DataPacketType_noDigital.names)
+
+    with open(logfile, 'rb') as bf:
+        for nline, line in enumerate(tqdm(bf, total=num_lines)):
+            bl = cobs.decode(base64.b64decode(line[:-1])[:-1])
+            dp = unpack_data_packet(bl,DataPacketStruct,DataPacket)
+
+            data[non_digital_names][nline] = np.frombuffer(bl[:-4], dtype=np_DataPacketType_noDigital)
+            digital_arr = np.frombuffer(bl[-4:], dtype=np.uint8)
+            data[nline]['digital_in'] = np.hstack([np.unpackbits(digital_arr[1]), np.unpackbits(digital_arr[0])])
+            data[nline]['digital_out'] = np.unpackbits(np.array(digital_arr[2], dtype=np.uint8))
+        #Check for packetID jumps
+    jumps = np.unique(np.diff(data['packetID']))
+    decoded = {"analog":data['analog'], 
+               "digital_in":data['digital_in'][:,::-1], 
+               "digital_out":data['digital_out'][:,::-1], 
+               "scanner_start_ts":data['us_start'], 
+               "scanner_transmit_ts":data['us_end'], 
+               "longVar":data['states'], 
+               "packetNums":data['packetID']}
+
+    return decoded
+
 
 def unpack_data_packet(dp,DataPacketStruct,DataPacket):
     s = struct.unpack(DataPacketStruct, dp)
@@ -149,7 +220,7 @@ def compute_sync_shift(scanner_digital,log_ts,frame_ts):
 
 def compute_sync_times(scanner_digital,log_ts,frame_ts):
     '''Computes the the log times in the scanner timeframe '''
-    sync_shift = lr.compute_sync_shift(scanner_digital=scanner_digital,log_ts=log_ts,frame_ts=frame_ts)
+    sync_shift = compute_sync_shift(scanner_digital=scanner_digital,log_ts=log_ts,frame_ts=frame_ts)
     times = log_ts/pow(10,6)-sync_shift
     return times
 
@@ -176,7 +247,7 @@ def compute_switch(digital_channel):
     onsets = np.where(np.diff(digital_channel)!=0)[0]
     return onsets
 
-def build_trial_matrix(digital_in,digital_out,sync_times):
+def build_trial_matrix(digital_in,digital_out):
     '''Builds trial matrix from digital channels and synchorized time axis'''
 
     trial_matrix = {'env_onset':[],'tunnel1_onset':[],'reward_zone_onset':[],
@@ -363,10 +434,10 @@ def build_trial_matrix(digital_in,digital_out,sync_times):
         trial_matrix['reward_offset'].append(np.nan)
 
     #convert in times:
-    for k in timestamp_keys:
-        for i in range(len(trial_matrix[k])):
-            if not np.isnan(trial_matrix[k][i]):
-                trial_matrix[k][i] = sync_times[int(trial_matrix[k][i])]
+    #for k in timestamp_keys:
+    #    for i in range(len(trial_matrix[k])):
+    #        if not np.isnan(trial_matrix[k][i]):
+    #            trial_matrix[k][i] = sync_times[int(trial_matrix[k][i])]
     
     #computes and store trial duration
     trial_matrix['trial_duration'] += list(np.asarray(trial_matrix['tunnel2_offset'])-np.asarray(trial_matrix['env_onset']))
