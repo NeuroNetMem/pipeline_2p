@@ -21,21 +21,28 @@ from caiman.source_extraction.cnmf.cnmf import load_CNMF
 #%%
 
 animal = '429420_toms'
-session = '20230202_429420'
-video = '20230202_429420_00001.tif'
+session = '20230210'
+animal_num = animal.split('_')[0]
+tif_file = glob.glob(f'/ceph/imaging1/arie/{animal}/{session}_{animal_num}/*.tif')[0]
+video = tif_file.split('/')[-1]
 
-tif_file = f'/ceph/imaging1/arie/{animal}/{session}/{video}'
 
-output_path = f'/scratch/dspalla/2p_data/{animal}/{session}'
+output_path = f'/scratch/dspalla/2p_data/{animal}/{session}' # output path for temporary preprocessed file
+preprocessed_data_path = f'/ceph/imaging1/davide/2p_data/{animal}/{session}'
 
-compute_flags = {'crop': True,
+compute_flags = {'crop': False,
                  'motion_correct': True,
-                 'save_metrics': True,
-                 'compute_raw_metrics': True,
-                 'compute_mcorr_metrics': True}
+                 'deconvolve' :True,
+                 'detrend_df_f': True,
+                 'compute_raw_metrics': False,
+                 'compute_mcorr_metrics': False
+                }
 
+metrics_params = {'raw':['mean_image','corr_pnr_images','frame_average'],
+                  'mcorr':['mean_image','frame_average']}
 
-cropping_params = {'cropping_limits': [100, -100, 100, -100]}
+cropping_params = {'cropping_limits': [100, -100, 100, -100],
+                   'cropping_times':[1000,30000]}
 
 mc_params = {# Caiman parameters
              'max_shifts': [5, 5],  #maximum allowed rigid shifts (in pixels)
@@ -44,7 +51,7 @@ mc_params = {# Caiman parameters
              'max_deviation_rigid': 5,  # maximum allowed rigid shifts (in pixels)
              'border_nan': 'copy',
              'pw_rigid': True,  # flag for performing non-rigid motion correction
-             'gSig_filt': None,}
+             'gSig_filt': None}
 
 cnmf_params  = {'fr': 30, # framerate of the video, very important!
                 'p': 1,   # order of autoregressive process contstraint
@@ -57,29 +64,30 @@ cnmf_params  = {'fr': 30, # framerate of the video, very important!
                 'ssub': 1, # spatial compression, if larger than one compresses
                 'tsub': 1, # temporal compression, if larger than one compresses
                 'method_init': 'greedy_roi',
-                'min_SNR': 2.0,  # min snr for good components
-                'rval_thr': 0.7, # spatial footprint consistency
+                'min_SNR': 3.0,  # min snr for good components
+                'rval_thr': 0.9, # spatial footprint consistency
                 'use_cnn': False,
                 'min_cnn_thr': 0.8,
                 'cnn_lowest': 0.1,
                 'decay_time': 0.4,
                 }
+df_f_params = {'quantileMin':8,
+               'frames_window':250       
+                }
 
-#make metrics object
 
-metrics = {'mean_img_raw':np.nan,
-           'corr_img_raw':np.nan,
-           'mean_img_mcorr':np.nan,
-           'corr_img_mcorr':np.nan}
-
+print(f'Analyzing file: {tif_file}')
 
 #make output folder 
 Path(output_path).mkdir(parents=True, exist_ok=True)
+Path(preprocessed_data_path).mkdir(parents=True, exist_ok=True)
 
 ## save parameters
-parameter_set = {'cropping':cropping_params,
+parameter_set = {'metrics': metrics_params,
+                 'cropping':cropping_params,
                  'mcorr': mc_params,
-                 'cnmf': cnmf_params
+                 'cnmf': cnmf_params,
+                 'df_f':df_f_params
                 }
 with open(Path(output_path).joinpath('parameters.yml'),'w') as file:
     yaml.dump(parameter_set,file)
@@ -94,7 +102,8 @@ if compute_flags['crop']:
     
     movie = cm.load(tif_file)
     [x1, x2, y1, y2] = cropping_params['cropping_limits']
-    movie = movie[:, x1:x2, y1:y2]
+    [t1,t2] = cropping_params['cropping_times']
+    movie = movie[t1:t2, x1:x2, y1:y2]
     
     movie.save(cropped_video_path)
     
@@ -108,27 +117,21 @@ else:
     print('skipping cropping.')
     
 
+# compute metrics on raw video
 if compute_flags['compute_raw_metrics']:
-    print('Loading movie ...')
+    
+   
+    print('Computing metrics on raw video ...')
     start_time = time.time()
     if not os.path.isfile(cropped_video_path):
         print('File not found')
 
     movie = cm.load(cropped_video_path)
-    mean_img = np.mean(movie, axis=0)
-    corr_img,pnr_img = cm.summary_images.correlation_pnr(movie,swap_dim=False)
+    metrics = fs.compute_metrics(movie,metrics_params['raw'])
     
-    metrics['mean_img_raw'] = mean_img
-    metrics['corr_img_raw'] = corr_img
-    metrics['pnr_img_raw'] = pnr_img
-    
-    # plot mean image
-    fig = plt.figure(figsize=(10, 10))
-    plt.imshow(mean_img, cmap='gray')
-    plt.savefig(output_path+'/mean_image_raw.png')
-    plt.close()
-    
-    
+    filehandler = open(output_path+'/raw_metrics.pickle', 'wb') 
+    pickle.dump(metrics, filehandler)
+    filehandler.close()
     
     
     # clear memory
@@ -137,7 +140,7 @@ if compute_flags['compute_raw_metrics']:
 
     print(f'Done in {(time.time()-start_time):.2f} seconds')
 else:
-    print('skipping metric calculations for RAW file')
+    print('skipping metric calculations for raw file')
     
     
 
@@ -152,16 +155,6 @@ if compute_flags['motion_correct']:
     if not os.path.isfile(mc_input_movie):
         print('File not found.')
 
-    # Calculate movie minimum to subtract from movie
-    
-    #movie = cm.load(mc_input_movie)
-    #min_mov = np.min(movie)
-    #len_movie = movie.shape[0]
-    
-    #mc_params['min_mov'] = min_mov
-    #mc_params['splits_rig'] = int(len_movie/mc_params['len_mcorr_chunk'])
-    #mc_params['splits_els'] = int(len_movie/mc_params['len_mcorr_chunk'])
-    # Apply the parameters to the CaImAn algorithm
     opts = params.CNMFParams(params_dict=mc_params)
     
 
@@ -182,53 +175,25 @@ if compute_flags['motion_correct']:
     mc.motion_correct(save_movie=True)
 
     print(f'Done in {(time.time()-start_time):.2f} seconds')
-    
-    if compute_flags['compute_mcorr_metrics']:
-        print('Loading movie ...')
-        start_time = time.time()
-
-        if mc_params['pw_rigid']:
-            movie = cm.load(mc.fname_tot_els)
-
-        else:
-            movie = cm.load(mc.fname_tot_rig)
-
-        mean_img = np.mean(movie, axis=0)
-        #corr_img,pnr_img = cm.summary_images.correlation_pnr(movie,swap_dim=False)
-
-        metrics['mean_img_mcorr'] = mean_img
-        #metrics['corr_img_mcorr'] = corr_img
-        #metrics['pnr_img_mcorr'] = pnr_img
-
-        # plot mean image
-        fig = plt.figure(figsize=(10, 10))
-        plt.imshow(mean_img, cmap='gray')
-        plt.savefig(output_path+'/mean_image_mcorr.png')
-        plt.close()
-
-
-
-        # clear memory
-        del(movie)
-        gc.collect()
-
-        print(f'Done in {(time.time()-start_time):.2f} seconds')
-    else:
-        print('skipping metric calculations for mcorr file')
-
 
 
     # MEMORY MAPPING
     print('Memory mapping ...')
     # memory map the file in order 'C'
     if mc_params['pw_rigid']:
+        motion_corrected_video_file = mc.fname_tot_els
         fname_new = cm.save_memmap(mc.fname_tot_els, base_name='memmap_', order='C',
                                    dview=dview) # exclude borders
     else:
+        motion_corrected_video_file = mc.fname_tot_rig
         fname_new = cm.save_memmap(mc.fname_tot_rig, base_name='memmap_', order='C',
                                    dview=dview) # exclude borders
 
     print('Done')
+    
+    # restart cluster to clean up memory
+    print('Stop server to clean memory')
+    cm.stop_server(dview=dview)
 
 
 else:
@@ -236,56 +201,81 @@ else:
     
 
 
+## Compute motion corrected metrics
+if compute_flags['compute_mcorr_metrics']:
+    try:
+        print('Computing metrics on motion corrected video ...')
+        start_time = time.time()
 
-if compute_flags['save_metrics']:
-    print('Savign metrics in pickle')
-    filehandler = open(output_path+'/metrics.pickle', 'wb') 
-    pickle.dump(metrics, filehandler)
-    filehandler.close()
+        movie = cm.load(motion_corrected_video_file)
+        metrics = fs.compute_metrics(movie,metrics_params['mcorr'])
+
+        filehandler = open(output_path+'/mcorr_metrics.pickle', 'wb') 
+        pickle.dump(metrics, filehandler)
+        filehandler.close()
 
 
+        # clear memory
+        del(movie)
+        gc.collect()
 
+        print(f'Done in {(time.time()-start_time):.2f} seconds')
+        
+    except NameError:
+        print('Motion corrected video not in memory, skipping metric calculation')
+        
+        
+else:
+    print('skipping metric calculations for motion corrected file')
 
-#%%
-# restart cluster to clean up memory
-print('Restart server to clean memory')
-cm.stop_server(dview=dview)
+    
+
 c, dview, n_processes = cm.cluster.setup_cluster(
     backend='local', n_processes=10, single_thread=False)
 
+
 # Source extraction
 
-# Load mmap images
-if compute_flags['motion_correct']:
-    
-    Yr, dims, T = cm.load_memmap(fname_new)
-    images = np.reshape(Yr.T, [T] + list(dims), order='F') 
-#%%
 print('Running source extraction ...')
+    
+Yr, dims, T = cm.load_memmap(fname_new)
+images = np.reshape(Yr.T, [T] + list(dims), order='F') 
+
+
 opts = params.CNMFParams(params_dict=cnmf_params)
 cnm = cnmf.CNMF(n_processes, params=opts, dview=dview)
 cnm = cnm.fit(images)
-cnm =cnm.refit(images)
 
+print('Refitting cnmf ...')
+cnm =cnm.refit(images)
+print('Evaluating components ...')
 cnm.estimates.evaluate_components(images, opts, dview=dview)
 
+if compute_flags['deconvolve']:
+    print('Deconvolve components')
+    cnm.deconvolve()
 
-#%%
+if compute_flags['detrend_df_f']:
+    print('Extract df/f')
+    cnm.estimates.detrend_df_f(quantileMin=df_f_params['quantileMin'], frames_window=df_f_params['frames_window'])
 
-print('Savign CNMF object in pickle')
-
-filehandler = open(output_path+'/cnmf.pickle', 'wb') 
-pickle.dump(cnm.estimates, filehandler)
-filehandler.close()
 
 print('Savign CNMF object in hdf5')
 output_cnmf_file_path = output_path+'/cnmf.hdf5'
 cnm.save(output_cnmf_file_path)
+
 
 cm.stop_server(dview=dview)
 
 log_files = glob.glob('*_LOG_*')
 for log_file in log_files:
     os.remove(log_file)
+    
+print(f'Saving neural data for downstream analysis @{preprocessed_data_path}')   
+fs.save_preprocessed_data(output_cnmf_file_path,preprocessed_data_path)
+with open(Path(preprocessed_data_path).joinpath('parameters.yml'),'w') as file:
+    yaml.dump(parameter_set,file)
 
 print('Done')
+
+
