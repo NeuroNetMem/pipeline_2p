@@ -47,13 +47,16 @@ for animal in sessions.keys():
         Path(save_path).mkdir(parents=True, exist_ok=True)
         
         decoded_log = lr.create_bp_structure(log_file)
-        frames = lr.extract_frame_timestamps(tif_file)
+        tif_header = lr.read_tif_header(tif_file)
+        frames = tif_header['frame_ts']
         
         #save decoded log
         savemat(preprocessed_data_path.joinpath('decoded_log.mat'),decoded_log)
         
         #save frame timestamps
-        np.save(preprocessed_data_path.joinpath('scanner_frame_timestamps.npy'),frames)
+        with open(preprocessed_data_path.joinpath('tif_header.pickle'),'wb') as file:
+                  pickle.dump(tif_header,file, protocol=pickle.HIGHEST_PROTOCOL)
+    
         
         digital_in = decoded_log['digitalIn'].astype(int)
         digital_out = decoded_log['digitalOut'].astype(int)

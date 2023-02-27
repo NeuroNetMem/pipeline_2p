@@ -2,6 +2,7 @@ from pathlib import Path
 import numpy as np
 import caiman as cm
 from caiman.source_extraction.cnmf.cnmf import load_CNMF
+import pickle
 
 def make_output_folder(path):
     Path(path).mkdir(parents=True, exist_ok=True)
@@ -43,6 +44,7 @@ def save_preprocessed_data(cnmf_file,output_path):
     Takes a cnmf.hdf5 file with the results of the preprocessing and saves it to the specified path as 'neural_data.pickle'
     '''
     
+    output_path = Path(output_path)
     
     cnmf = load_CNMF(cnmf_file)
     ests = cnmf.estimates

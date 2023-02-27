@@ -37,45 +37,31 @@ def print_header_content(tif_file):
             print(f'{name} --> {value}')
     return
 
-# OLD
-def read_ScanImageTiffHeader(file_path):
-
+def read_tif_header(tif_file):
     '''
-    Reads header description information of ScanImageTiff File
-    input: (str) tiff file path
-    output: (list) Dictionary and list containing I2C events information and frame timestamps 
-    
+    Reads tif header and extract frame timestamps (in seconds) and scanner sincronization data.
+    Takes tif path as input, return dict with timestamps and syncronization data.
     '''
-    frameTs = []
-    i2c_timestamp = []
-    i2c_values = []
-    i2c_frameN = []
+    tag_structure = {'image_description':5,
+                     'frame_timestamp':3,
+                     'i2c_data':14} # position of required information in tif header
+    frame_ts = []
+    i2c_data = {'ts':[],'value':[],'frame_n':[]}
     
-    print('Reading .tif header')
-    with ScanImageTiffReader(file_path) as reader:
-        time = reader.shape()[0]
-        for frame in tqdm(range(time)):
-            x = reader.description(frame)
-            description = x.split('\n')
-            frameTs.append(float(description[3].split('=')[1]))
-            i2c= description[14].split('=')
-            if len(i2c[1])>3:
-                y = i2c[1].split('{{')[1].split(']}')
-                if len(y)==1:
-                    i2c_timestamp.append(float(y[events].split(',')[0]))
-                    i2c_values.append(int(y[events].split('[')[1]))
-                    i2c_frameN.append(frame)
-                else: 
-                    i2c_timestamp.append(float(y[0].split(',')[0]))
-                    i2c_values.append(int(y[0].split('[')[1].split(',')[0]))
-                    i2c_frameN.append(frame)
-                    for events in range(1,len(y)-1):
-                        i2c_timestamp.append(float(y[events].split(',')[0].split('{')[1]))
-                        i2c_values.append(int(y[events].split('[')[1].split(',')[0]))
-                        i2c_frameN.append(frame)
-                        
-    I2C = {"ts":i2c_timestamp, "val":i2c_values, "frameNum":i2c_frameN}
-    return I2C, frameTs
+    with tifffile.TiffFile(tif_file) as tif:
+        for i,page in tqdm(enumerate(tif.pages)):
+            description = page.tags.values()[tag_structure['image_description']].value # extract image description string
+            timestamp = float(description.split('\n')[tag_structure['frame_timestamp']].split('=')[-1]) # fetch timestamp in image description
+            frame_ts.append(timestamp)
+            
+            i2c_line = description.split('\n')[tag_structure['i2c_data']]
+            data = i2c_line.split('=')[-1].strip(' {').strip('}').strip(' }')
+            if len(data)>0:
+                i2c_data['ts'].append(float(data.split(',')[0]))
+                i2c_data['value'].append(int(data.split(',')[-1].strip(' [').strip(']')))
+                i2c_data['frame_n'].append(i)
+            
+    return {'frame_ts':frame_ts,'i2c_data':i2c_data}
 
 # OLD
 def create_bp_structure(bp):
