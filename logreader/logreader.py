@@ -9,6 +9,7 @@ from ScanImageTiffReader import  ScanImageTiffReader
 import pandas as pd
 
 
+#OLD
 def extract_frame_timestamps(tif_file):
     '''
     Reads tif header and extract frame timestamps (in seconds).
@@ -212,7 +213,6 @@ def count_lines(fp):
         count = sum(buf.count(b'\n') for buf in _make_gen(f.raw.read))
     return count
 
-# TO ADD: something that reshapes decoded log, labels it and saves it
 
 def compute_sync_shift(scanner_digital,log_ts,frame_ts):
     '''
@@ -264,14 +264,6 @@ def compute_switch(digital_channel):
     onsets = np.where(np.diff(digital_channel)!=0)[0]
     return onsets
 
-def compute_position(decoded_log,sync_times):
-    position = decoded_log['longVar'][:,1]
-    return position
-def compute_lick_timestamps(decoded_log,sync_times):
-    digital_out = decoded_log['digitalOut'].astype(int)
-    lick_idxs = compute_onsets(digital_out[:,-2])
-    lick_ts = sync_times[lick_idxs]
-    return lick_ts
 
 def is_sound(sound_onsets,t1,t2):
     return np.any(np.logical_and((t1<sound_onsets),(t2>sound_onsets)))

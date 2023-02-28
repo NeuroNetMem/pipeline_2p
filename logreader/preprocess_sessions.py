@@ -62,14 +62,21 @@ for animal in sessions.keys():
         digital_out = decoded_log['digitalOut'].astype(int)
         digital_scan_signal = digital_in[:,6]
         log_times = decoded_log['startTS']
+        
+        
         sync_times = lr.compute_sync_times(digital_scan_signal,log_times,frames)
 
         tm = lr.build_trial_matrix(digital_in,digital_out)
         
-        position = lr.compute_position(decoded_log,sync_times)
-        licks = lr.compute_lick_timestamps(decoded_log,sync_times)
+        position = decoded_log['longVar'][:,1].astype(int)
+        lick_onsets = lr.compute_onsets(digital_out[:,-2])
+        lick_offsets = lr.compute_offsets(digital_out[:,-2])
+        reward_onsets = lr.compute_onsets(digital_out[:,0])
+        reward_offsets = lr.compute_offsets(digital_out[:,0])
 
-        data = {'time':sync_times,'position':position.astype('int'),'licks':licks}
+        data = {'time':sync_times,'position':position.astype('int'),
+                'lick_onsets':lick_onsets,'lick_offsets':lick_offsets,
+                'reward_onsets':reward_onsets,'reward_offsets':reward_offsets}
         
         # save preprocessed behaviour
         filename = save_path.joinpath('behaviour_data.pickle')
