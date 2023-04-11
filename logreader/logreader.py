@@ -264,6 +264,17 @@ def compute_switch(digital_channel):
     onsets = np.where(np.diff(digital_channel)!=0)[0]
     return onsets
 
+def clean_switches(switch_list,time_th=500):
+    clean_switch = []
+    for i in range(0,len(switch_list),2):
+        if i+1<len(switch_list):
+            if abs(switch_list[i+1]-switch_list[i])>time_th:
+                clean_switch.append(switch_list[i])
+                clean_switch.append(switch_list[i+1])
+        else:
+            clean_switch.append(switch_list[i])
+    return np.asarray(clean_switch)
+
 
 def is_sound(sound_onsets,t1,t2):
     return np.any(np.logical_and((t1<sound_onsets),(t2>sound_onsets)))
@@ -326,6 +337,10 @@ def build_trial_matrix(digital_in,digital_out):
     env1_switches = np.hstack([np.asarray([0.0]),compute_switch(env1)]) 
     env2_switches = compute_switch(env2)
     env3_switches = compute_switch(env3)
+    
+    env1_switches = clean_switches(env1_switches)
+    env2_switches = clean_switches(env2_switches)
+    env3_switches = clean_switches(env3_switches)
    
     
     #concatenate environments
@@ -373,7 +388,7 @@ def build_trial_matrix(digital_in,digital_out):
     trial_matrix['tunnel2_offset'].append(int(np.min(env_switches[env_switches>rz_offsets[0]])))
     
     trial_matrix['trial_duration'].append(np.nan)
-    trial_matrix['env_label'].append(int(env_labels[np.argmax(env_switches[env_switches<rz_onsets[0]])]))
+    trial_matrix['env_label'].append(int(env_labels[0]))
     
     if is_sound(sound_onsets,env_switches[0],rz_onsets[0]):
         sound_onset = int(np.min(sound_onsets[sound_onsets>env_switches[0]]))
@@ -406,7 +421,8 @@ def build_trial_matrix(digital_in,digital_out):
             trial_matrix['tunnel2_offset'].append(np.nan)
             
         trial_matrix['trial_duration'].append(np.nan)
-        trial_matrix['env_label'].append(int(env_labels[np.argmax(env_switches[env_switches<rz_onsets[i]])]))
+        trial_matrix['env_label'].append(int(env_labels[np.where(env_switches<rz_offsets[i])[0][-1]]))
+        #trial_matrix['env_label'].append(int(env_labels[np.argmax(env_switches[env_switches<rz_onsets[i]])]))
         
         if is_sound(sound_onsets,rz_offsets[i-1],rz_onsets[i]):
             sound_onset = int(np.min(sound_onsets[sound_onsets>rz_offsets[i-1]]))
