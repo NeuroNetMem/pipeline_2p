@@ -6,7 +6,7 @@ import shutil
 import yaml
 import gc
 import glob
-import mymemmap as mym
+import pipeline.mymemmap as mym
 
 import caiman as cm
 from caiman.motion_correction import MotionCorrect, high_pass_filter_space

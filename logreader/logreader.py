@@ -651,9 +651,9 @@ def build_trial_matrix_old(digital_in,digital_out):
 
 ################# preprocess session function
 
-def preprocess_vr_data(session_folder):
+def preprocess_vr_data(tif_file = None, log_file = None):
     '''
-    Preprocesses the vr data in the given folder
+    Preprocesses the vr data in the given tif and log files
     
     RETURNS:
     vr_data: dictionary with the following keys
@@ -665,8 +665,8 @@ def preprocess_vr_data(session_folder):
     '''
     
     #reads log file and tif header
-    decoded_log = lr.create_bp_structure(log_file)
-    tif_header = lr.read_tif_header(tif_file)
+    decoded_log = create_bp_structure(log_file)
+    tif_header = read_tif_header(tif_file)
     frames = tif_header['frame_ts']
     
     # type conversion
@@ -676,17 +676,17 @@ def preprocess_vr_data(session_folder):
     log_times = decoded_log['startTS']
 
     # compute synchronized timestamps    
-    sync_times = lr.compute_sync_times(digital_scan_signal,log_times,frames)
+    sync_times = compute_sync_times(digital_scan_signal,log_times,frames)
     
     # build trial matrix
-    tm = lr.build_trial_matrix(digital_in,digital_out)
+    tm = build_trial_matrix(digital_in,digital_out)
     
     #extract behavioural data    
     position = decoded_log['longVar'][:,1].astype(int)
-    lick_onsets = lr.compute_onsets(digital_out[:,-2])
-    lick_offsets = lr.compute_offsets(digital_out[:,-2])
-    reward_onsets = lr.compute_onsets(digital_out[:,0])
-    reward_offsets = lr.compute_offsets(digital_out[:,0])
+    lick_onsets = compute_onsets(digital_out[:,-2])
+    lick_offsets = compute_offsets(digital_out[:,-2])
+    reward_onsets = compute_onsets(digital_out[:,0])
+    reward_offsets = compute_offsets(digital_out[:,0])
     
 
     data = {'time':sync_times,'position':position.astype('int'),
@@ -698,25 +698,27 @@ def preprocess_vr_data(session_folder):
 
     return vr_data
 
-def save_processed_vr_data(ouptut_file,vr_data):
+def save_processed_vr_data(output_path,vr_data):
+    
+    
     decoded_log = vr_data['decoded_log']
-    tif_headet = vr_data['tif_header']
+    tif_header = vr_data['tif_header']
     tm = vr_data['trial_matrix']
     data = vr_data['behavioural_data']
     
     #save decoded log
-    savemat(preprocessed_data_path.joinpath('decoded_log.mat'),decoded_log)
+    savemat(output_path.joinpath('decoded_log.mat'),decoded_log)
     #save frame timestamps
-    with open(preprocessed_data_path.joinpath('tif_header.pickle'),'wb') as file:
+    with open(output_path.joinpath('tif_header.pickle'),'wb') as file:
               pickle.dump(tif_header,file, protocol=pickle.HIGHEST_PROTOCOL)
             
     # save preprocessed behaviour
-    filename = save_path.joinpath('behaviour_data.pickle')
+    filename = output_path.joinpath('behaviour_data.pickle')
     with open(filename, 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     # save trial matrix
-    filename = save_path.joinpath('trial_data.csv')
+    filename = output_path.joinpath('trial_data.csv')
     tm.to_csv(filename,index=False)
     
     return

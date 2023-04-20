@@ -1,10 +1,9 @@
-import logreader as lr
 from pathlib import Path
 import pickle
 import tifffile
 import glob
 import numpy as np
-from scipy.io import savemat
+from logreader import preprocess_vr_data,save_processed_vr_data
 
 animals = []
 dates = []
@@ -42,49 +41,14 @@ for animal in sessions.keys():
         print(f'log file: {log_file}')
         print(f'tif file: {tif_file}')
         
-        #make output dir
-        save_path = preprocessed_data_path.joinpath(f'{animal}/{date}')
-        Path(save_path).mkdir(parents=True, exist_ok=True)
+        #preprocess vr data
+        vr_data = preprocess_vr_data(tif_file = tif_file, log_file=log_file)
         
-        decoded_log = lr.create_bp_structure(log_file)
-        tif_header = lr.read_tif_header(tif_file)
-        frames = tif_header['frame_ts']
-        
-        #save decoded log
-        savemat(preprocessed_data_path.joinpath('decoded_log.mat'),decoded_log)
-        
-        #save frame timestamps
-        with open(preprocessed_data_path.joinpath('tif_header.pickle'),'wb') as file:
-                  pickle.dump(tif_header,file, protocol=pickle.HIGHEST_PROTOCOL)
-    
-        
-        digital_in = decoded_log['digitalIn'].astype(int)
-        digital_out = decoded_log['digitalOut'].astype(int)
-        digital_scan_signal = digital_in[:,6]
-        log_times = decoded_log['startTS']
+        #save preprocessed data
+        output_path = preprocessed_data_path.joinpath(f'{animal}/{date}')
+        Path(output_path).mkdir(parents=True, exist_ok=True)
+        save_processed_vr_data(output_path,vr_data)
         
         
-        sync_times = lr.compute_sync_times(digital_scan_signal,log_times,frames)
-
-        tm = lr.build_trial_matrix(digital_in,digital_out)
-        
-        position = decoded_log['longVar'][:,1].astype(int)
-        lick_onsets = lr.compute_onsets(digital_out[:,-2])
-        lick_offsets = lr.compute_offsets(digital_out[:,-2])
-        reward_onsets = lr.compute_onsets(digital_out[:,0])
-        reward_offsets = lr.compute_offsets(digital_out[:,0])
-
-        data = {'time':sync_times,'position':position.astype('int'),
-                'lick_onsets':lick_onsets,'lick_offsets':lick_offsets,
-                'reward_onsets':reward_onsets,'reward_offsets':reward_offsets}
-        
-        # save preprocessed behaviour
-        filename = save_path.joinpath('behaviour_data.pickle')
-        with open(filename, 'wb') as handle:
-            pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        
-        # save trial matrix
-        filename = save_path.joinpath('trial_data.csv')
-        tm.to_csv(filename,index=False)
             
         
