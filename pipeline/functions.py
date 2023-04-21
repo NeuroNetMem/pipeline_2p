@@ -6,7 +6,7 @@ import shutil
 import yaml
 import gc
 import glob
-import mymemmap as mym
+import pipeline.mymemmap as mym
 
 import caiman as cm
 from caiman.motion_correction import MotionCorrect, high_pass_filter_space
@@ -136,7 +136,8 @@ def make_output_dirs(output_path,preprocessed_data_path):
 
 ##### caiman functions
 
-def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_folder=None):
+def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_folder=None,
+                     keep_temp_folder=False):
     # CHANGES:
     # docs
     # use Path everywhere
@@ -287,9 +288,9 @@ def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_fo
     print(f'Saving neural data for downstream analysis @{output_folder}')   
     save_preprocessed_data(output_cnmf_file_path,output_folder)
     
-    
-    print('Cleaning temporary output directory')
-    shutil.rmtree(temp_folder)
+    if not keep_temp_folder:
+        print('Cleaning temporary output directory')
+        shutil.rmtree(temp_folder)
         
 
     print('Done')    
