@@ -109,9 +109,12 @@ for animal in sessions.keys():
         
         #Decode log and process behaviour
         if preprocess_vr_data:
-            vr_data = lr.preprocess_vr_data(tif_file = tif_file, log_file=log_file)
-            lr.save_processed_vr_data(output_path,vr_data)
-            
+            try:
+                vr_data = lr.preprocess_vr_data(tif_file = tif_file, log_file=log_file)
+                lr.save_processed_vr_data(output_path,vr_data)
+            except:
+                print(f'Error in session {animal}_{date}, skipping ...')
+                continue
         
         #Run caiman pipeline 
         if preprocess_2p_video:
