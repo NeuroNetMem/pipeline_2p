@@ -15,6 +15,24 @@ from caiman.source_extraction import cnmf
 from caiman.source_extraction.cnmf.cnmf import load_CNMF
 
 
+def load_session_parameters(animal=None,date=None,params_folder=None):
+    '''
+    Loads preprocessing parameters for session from the given folder. If session paraeters are not found, defaults to default_params.yml in the folder.
+    
+    '''
+    session_file = params_folder.joinpath(f'parameters_{animal}_{date}.yml')
+    if os.path.exists(session_file):
+        filename = session_file
+    else:
+        print(f'No session parameters found for {animal}_{date}, using default.')
+        filename = params_folder.joinpath('default_parameters.yml')
+    
+    with open(filename, 'r') as stream:
+        parameters=yaml.safe_load(stream)
+
+    
+    return parameters
+    
 
 
 def make_output_folder(path):
