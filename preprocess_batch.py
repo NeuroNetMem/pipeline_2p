@@ -12,13 +12,22 @@ preprocessed_data_path = Path('/ceph/imaging1/davide/2p_data')
 
 
 # SESSION TO PREPROCESS
-sessions = {'441406_fiano':['20230301','20230306','20230307','20230308','20230309','20230315','20230316','20230317','20230320','20230321'],
-            '441394_ribolla':['20230301','20230306','20230307','20230308','20230309','20230315','20230316','20230317','20230320','20230321']
+sessions = {'441394_ribolla':['20230301','20230306','20230307','20230308','20230309',
+                              '20230315','20230316','20230317','20230320','20230321'
+                              '20230323','20230324','20230328','20230330','20230331',
+                              '20230404','20230405','20230406','20230407','20230408',
+                              '20230411','20230412','20230413','20230414'],
+            
+            '441406_fiano': ['20230301','20230306','20230307','20230308','20230309',
+                              '20230315','20230316','20230317','20230320','20230321'
+                              '20230323','20230324','20230328','20230330','20230331',
+                              '20230404','20230405','20230406','20230407','20230408',
+                              '20230411','20230412','20230413','20230414']
            }
 
 # PREPROCESSING STEPS
-preprocess_vr_data = False
-preprocess_2p_video = True
+preprocess_vr_data = True
+preprocess_2p_video = False
 
 
 
@@ -71,10 +80,14 @@ for animal in sessions.keys():
             temp_path = temp_output_path.joinpath(f'{animal}/{date}')
             Path(temp_path).mkdir(parents=True, exist_ok=True)
             
-            fs.preprocess_video(input_video=tif_file,
-                            output_folder=output_path,
-                            parameters=parameters,
-                            temp_folder=temp_path)
+            try:
+                fs.preprocess_video(input_video=tif_file,
+                                output_folder=output_path,
+                                parameters=parameters,
+                                temp_folder=temp_path)
+            except:
+                print(f'Error in session {animal}_{date}, 2p preprocessing skipping ...')
+                continue
         
         
         
