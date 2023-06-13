@@ -332,6 +332,9 @@ def build_trial_matrix(digital_in,digital_out):
     env2 = digital_in[:,channels_in['env2']]
     env3 = digital_in[:,channels_in['env3']]
     sound = digital_in[:,channels_in['sound']]
+    #check id sound is witched, if True, switch it back
+    if sum(sound)/len(sound)>0.5:
+        sound = invert_polarity(sound)
     reward = digital_out[:,channels_out['reward']]
 
     #compute environment onsets and offsets
