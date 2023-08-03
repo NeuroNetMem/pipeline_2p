@@ -1,5 +1,5 @@
 '''
-This fle contains a standalone script to preprocess a given experimental session.
+This file contains a standalone script to preprocess a given experimental session.
 It lets the user specify the session (.tif file) and all necessary caiman parameters and desired preprocessing steps.
 It saves the preprocessing outptut in the specified folder, as well as all the interim steps in another, user-specified path for in-detail inspaction.
 '''
