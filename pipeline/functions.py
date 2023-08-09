@@ -290,7 +290,7 @@ def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_fo
     # CROPPING AND PREPROCESSING
     print('Cropping movie ...')
     movie = cm.load(input_video)
-    movie = crop_movie(movie,cropping_params=cropping_params)     
+    movie = crop_movie(movie,cropping_params=cropping_params)   
     
     if compute_flags['correct_luminance']:
         print('Correcting luminance fluctuations')
@@ -299,6 +299,7 @@ def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_fo
     #save processed movie as mmap file
     cropped_video_path = temp_folder+f'/cropped.mmap'
     movie.save(cropped_video_path)
+    print('temp file saved')
 
     # clear memory
     del(movie)
@@ -412,9 +413,9 @@ def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_fo
     frame_ts = lr.extract_frame_timestamps(input_video)
     save_preprocessed_data(output_cnmf_file_path,output_folder,frame_ts=frame_ts)
     
-    if not keep_temp_folder:
-        print('Cleaning temporary output directory')
-        shutil.rmtree(temp_folder)
+    
+    print('Cleaning temporary output directory')
+    shutil.rmtree(temp_folder)
         
 
     print('Done')    
