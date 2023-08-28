@@ -1,3 +1,8 @@
+'''
+This module contains a tweaked implementation of CaImAn's save_memmap functions. It manually sets the 'in_memory' argument in the cm.load() function that reads the file (line 140) to 'False', in order to let the function handle big files. The flag is currently not exposed to the user, a better fix would be rewriting the caiman function to allow for that.
+'''
+
+
 from past.builtins import basestring
 from past.utils import old_div
 
@@ -130,6 +135,8 @@ def save_memmap(filenames: List[str],
 
             else:
                 if isinstance(f, (basestring, list)):
+                    # the in-memory option is changed with respect to caiman base function, to allow handling
+                    # of large files
                     Yr = cm.load(caiman.paths.fn_relocated(f), fr=1, in_memory=False, var_name_hdf5=var_name_hdf5)
                 else:
                     Yr = cm.movie(f)

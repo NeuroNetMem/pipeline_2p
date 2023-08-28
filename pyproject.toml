@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "pipeline-2p"
 version = "0.1.0"
-description = "Pipeline for the preprocessing of 2p calcium imaging videos
+description = "Pipeline for the preprocessing of 2p calcium imaging videos"
 authors = ["davidespalla <spalladavide.92@gmail.com>"]
 readme = "README.md"
 packages = [{include = "pipeline_2p"}]

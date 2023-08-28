@@ -1,3 +1,7 @@
+'''
+This modules contains utility functions for the 2p video preprocessing pipeline.
+'''
+
 from pathlib import Path
 import numpy as np
 import pickle
@@ -14,11 +18,29 @@ from caiman.source_extraction.cnmf import params as params
 from caiman.source_extraction import cnmf
 from caiman.source_extraction.cnmf.cnmf import load_CNMF
 
+import logreader.logreader as lr
+
+def load_parameters_yaml(yaml_file):
+    
+    with open(yaml_file, 'r') as stream:
+        parameters=yaml.safe_load(stream)
+
+    
+    return parameters
+    
+
 
 def load_session_parameters(animal=None,date=None,params_folder=None):
     '''
-    Loads preprocessing parameters for session from the given folder. If session paraeters are not found, defaults to default_params.yml in the folder.
-    
+    Loads preprocessing parameters for a session from the given folder. If session parameters are not found, defaults to default_params.yml in the folder.
+
+    Parameters:
+        animal (str): Animal identifier for the session.
+        date (str): Date of the session.
+        params_folder (str): Path to the folder containing the parameter files.
+
+    Returns:
+        dict: Dictionary containing the loaded preprocessing parameters.
     '''
     session_file = params_folder.joinpath(f'parameters_{animal}_{date}.yml')
     if os.path.exists(session_file):
@@ -36,6 +58,16 @@ def load_session_parameters(animal=None,date=None,params_folder=None):
 
 
 def make_output_folder(path):
+    '''
+    Creates output folders for different preprocessing stages.
+    This contains old functionality and will be discontinued
+
+    Parameters:
+        path (str): Path to the main output folder.
+
+    Returns:
+        None
+    '''
     Path(path).mkdir(parents=True, exist_ok=True)
     Path(path+'/cropping').mkdir(parents=True, exist_ok=True)
     Path(path+'/motion_correction').mkdir(parents=True, exist_ok=True)
@@ -48,7 +80,14 @@ def make_output_folder(path):
 
 def compute_metrics(movie,metrics_list):
     '''
-    inputs: caiman movie, list of metric keywords
+    Computes selected metrics for the given CaImAn movie.
+
+    Parameters:
+        movie (np.ndarray): CaImAn movie data.
+        metrics_list (list): List of strings specifying the metrics to compute.
+
+    Returns:
+        dict: Dictionary containing the computed metrics.
     '''
     
     metric_func = {'mean_image': lambda x: np.mean(x, axis=0),
@@ -72,9 +111,19 @@ def compute_metrics(movie,metrics_list):
 
 # TO DO: add snr, spatial consistency and cnn metrics to the save, for future selection
 
-def save_preprocessed_data(cnmf_file,output_path):
+def save_preprocessed_data(cnmf_file,output_path,frame_ts = None):
     '''
-    Takes a cnmf.hdf5 file with the results of the preprocessing and saves it to the specified path as 'neural_data.pickle'
+    Takes a cnmf.hdf5 file with the results of the preprocessing and saves it to the specified path as 'neural_data.pickle'.
+    Optionally takes an array of frame timestamps to populate the 'frame_ts' key of the neural data dict. 
+    If not provided, this is hard coded with a framerate of 29.94 Hz.
+
+    Parameters:
+        cnmf_file (str): Path to the cnmf.hdf5 file.
+        output_path (str): Path to the folder where the data will be saved.
+        frame_ts (Array-like, optional): 1d array with frame times in seconds.
+
+    Returns:
+        None
     '''
     
     output_path = Path(output_path)
@@ -99,6 +148,26 @@ def save_preprocessed_data(cnmf_file,output_path):
     neural_data['positions'] = np.asarray([i['CoM'] for i in ests.coordinates])[ests.idx_components]
     neural_data['contour'] = [l['coordinates'] for i,l in enumerate(ests.coordinates) if i in ests.idx_components]
     
+    if frame_ts is None:
+        # if frame_ts is not provided they are inferred with scanner framerate of 29.94 Hz
+        scanner_fps = 29.94
+        end_time = neural_data['traces'].shape[1]/scanner_fps
+        neural_data['frame_ts'] = np.arange(0, end_time, 1./scanner_fps)
+        
+    elif len(frame_ts)-1 != neural_data['traces'].shape[1]:
+        # if shape does not match, a warning is raised and the provided frame ts is not uses
+        # NOTE: the caiman algorithms returns traces without the last frame, so the comparison
+        # is between len(frame_ts)-1 and len neural data
+        len_traces = neural_data['traces'].shape[1]
+        print(f'frame_ts with len {len(frame_ts)} incompatible with traces with len {len_traces} \n defaulting to 29.94 Hz timestamps.')
+        scanner_fps = 29.94
+        end_time = neural_data['traces'].shape[1]/scanner_fps
+        neural_data['frame_ts'] = np.arange(0, end_time, 1./scanner_fps)
+        
+    else:
+        # if both control pass, frame_ts is used
+        neural_data['frame_ts'] = bp.asarray(frame_ts[:-1]) #last frame is dropped in the caiman traces, last ts dropped for consistency
+    
 
     save_path = output_path.joinpath('neural_data.pickle')
     filehandler = open(save_path, 'wb') 
@@ -110,8 +179,14 @@ def save_preprocessed_data(cnmf_file,output_path):
 
 def correct_avg_fluctuations(movie):
     '''
-    Subtracts the frame average to each frame to correct for luminance fluctuations.
-    Subtracts the minumum of the corrected movie to have non-negative values.
+    Divides each frame by its average to correct for luminance fluctuations.
+    Subtracts the minimum of the corrected movie to have non-negative values.
+
+    Parameters:
+        movie (np.ndarray): Input movie data.
+
+    Returns:
+        np.ndarray: Corrected movie data.
     '''
     movie = movie - np.min(movie.flatten())
     frame_avgs = np.mean(movie,axis=(1,2))
@@ -121,6 +196,16 @@ def correct_avg_fluctuations(movie):
     return corrected_movie
 
 def rename_file(old_file_name,new_file_name):
+    '''
+    Renames a file. Used during memory mapping.
+
+    Parameters:
+        old_file_name (str): Path to the existing file.
+        new_file_name (str): Path to the desired new file name.
+
+    Returns:
+        None
+    '''
     try:
         os.rename(old_file_name, new_file_name)
     except FileNotFoundError:
@@ -129,8 +214,15 @@ def rename_file(old_file_name,new_file_name):
 
 def make_output_dirs(output_path,preprocessed_data_path):
     '''
-    Create directory for temporary files and for final outputs.
-    If temporary directory exists, ask if user wants to overwrite.
+    Creates directories for temporary files and for final outputs.
+    If the temporary directory exists, asks if the user wants to overwrite.
+
+    Parameters:
+        output_path (str): Path to the main output folder.
+        preprocessed_data_path (str): Path to the preprocessed data folder.
+
+    Returns:
+        None
     '''
     
     
@@ -156,6 +248,19 @@ def make_output_dirs(output_path,preprocessed_data_path):
 
 def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_folder=None,
                      keep_temp_folder=False):
+    '''
+    Preprocesses a video using CaImAn pipeline with the provided parameters.
+
+    Parameters:
+        input_video (str): Path to the input video file.
+        output_folder (str): Path to the main output folder.
+        parameters (dict): Dictionary containing preprocessing parameters.
+        temp_folder (str): Path to the temporary output folder.
+        keep_temp_folder (bool): If True, keeps the temporary output folder; otherwise, removes it.
+
+    Returns:
+        None
+    '''
     # CHANGES:
     # docs
     # use Path everywhere
@@ -185,7 +290,7 @@ def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_fo
     # CROPPING AND PREPROCESSING
     print('Cropping movie ...')
     movie = cm.load(input_video)
-    movie = crop_movie(movie,cropping_params=cropping_params)     
+    movie = crop_movie(movie,cropping_params=cropping_params)   
     
     if compute_flags['correct_luminance']:
         print('Correcting luminance fluctuations')
@@ -194,6 +299,7 @@ def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_fo
     #save processed movie as mmap file
     cropped_video_path = temp_folder+f'/cropped.mmap'
     movie.save(cropped_video_path)
+    print('temp file saved')
 
     # clear memory
     del(movie)
@@ -304,11 +410,12 @@ def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_fo
         
     #save to output folder
     print(f'Saving neural data for downstream analysis @{output_folder}')   
-    save_preprocessed_data(output_cnmf_file_path,output_folder)
+    frame_ts = lr.extract_frame_timestamps(input_video)
+    save_preprocessed_data(output_cnmf_file_path,output_folder,frame_ts=frame_ts)
     
-    if not keep_temp_folder:
-        print('Cleaning temporary output directory')
-        shutil.rmtree(temp_folder)
+    
+    print('Cleaning temporary output directory')
+    shutil.rmtree(temp_folder)
         
 
     print('Done')    
@@ -320,8 +427,14 @@ def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_fo
 
 def crop_movie(movie,cropping_params=None):
     '''
-    Crops video with given pixel and time parameters
-    TO DO: implement data checks (crop params, boundary compatibility).
+    Crops the video with given pixel and time parameters.
+
+    Parameters:
+        movie (np.ndarray): Input movie data.
+        cropping_params (dict): Dictionary containing cropping parameters.
+
+    Returns:
+        np.ndarray: Cropped movie data.
     '''
     
     [x1, x2, y1, y2] = cropping_params['cropping_limits']
@@ -331,7 +444,16 @@ def crop_movie(movie,cropping_params=None):
 
 def motion_correct_movie(movie_path,output_basename=None,mc_params=None,n_cpu=1):
     '''
-    Motion corrects movie, saves to given output basename
+    Motion corrects the given video file and saves it with the specified output basename.
+
+    Parameters:
+        movie_path (str): Path to the input video file.
+        output_basename (str): Basename to be used for the output file (without extension).
+        mc_params (dict): Dictionary containing motion correction parameters.
+        n_cpu (int): Number of CPU cores to be used for motion correction. Defaluts to 1.
+
+    Returns:
+        None
     '''
     
     if not os.path.isfile(movie_path):
@@ -370,7 +492,14 @@ def motion_correct_movie(movie_path,output_basename=None,mc_params=None,n_cpu=1)
 
 def mmap_F2C(input_fname,output_basename=None):
     '''
-    maps given file from F to C order
+    Maps the given file from Fortran (F, column major) order to C (row major) order.
+
+    Parameters:
+        input_fname (str): Path to the input file in Fortran order.
+        output_basename (str): Basename to be used for the output file (without extension).
+
+    Returns:
+        None
     '''
     
 

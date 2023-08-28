@@ -8,7 +8,7 @@ import pipeline.functions as fs
 raw_data_path = Path('/ceph/imaging1/arie')
 params_folder = raw_data_path.joinpath('preprocess_params')
 temp_output_path = Path('/scratch/dspalla/2p_data')
-preprocessed_data_path = Path('/ceph/imaging1/davide/2p_data')
+preprocessed_data_path = Path('/ceph/imaging1/davide/2p_data_no_luminance_corr')
 
 
 # SESSION TO PREPROCESS
@@ -26,8 +26,8 @@ sessions = {'441394_ribolla':['20230301','20230306','20230307','20230308','20230
            }
 
 # PREPROCESSING STEPS
-preprocess_vr_data = True
-preprocess_2p_video = False
+preprocess_vr_data = False
+preprocess_2p_video = True
 
 
 
