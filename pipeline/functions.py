@@ -166,7 +166,7 @@ def save_preprocessed_data(cnmf_file,output_path,frame_ts = None):
         
     else:
         # if both control pass, frame_ts is used
-        neural_data['frame_ts'] = bp.asarray(frame_ts[:-1]) #last frame is dropped in the caiman traces, last ts dropped for consistency
+        neural_data['frame_ts'] = np.asarray(frame_ts[:-1]) #last frame is dropped in the caiman traces, last ts dropped for consistency
     
 
     save_path = output_path.joinpath('neural_data.pickle')
@@ -411,11 +411,11 @@ def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_fo
     #save to output folder
     print(f'Saving neural data for downstream analysis @{output_folder}')   
     frame_ts = lr.extract_frame_timestamps(input_video)
-    save_preprocessed_data(output_cnmf_file_path,output_folder,frame_ts=frame_ts)
+    save_preprocessed_data(cnmf_destination_file,output_folder,frame_ts=frame_ts)
     
     
-    print('Cleaning temporary output directory')
-    shutil.rmtree(temp_folder)
+    print(f'Cleaning temporary output directory: {str(temp_folder)}')
+    shutil.rmtree(str(temp_folder))
         
 
     print('Done')    
