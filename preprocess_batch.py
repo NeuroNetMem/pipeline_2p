@@ -3,30 +3,26 @@ from pathlib import Path
 import glob
 import logreader.logreader as lr
 import pipeline.functions as fs
+import shutil
 
 
 raw_data_path = Path('/ceph/imaging1/arie')
 params_folder = raw_data_path.joinpath('preprocess_params')
 temp_output_path = Path('/scratch/dspalla/2p_data')
-preprocessed_data_path = Path('/ceph/imaging1/davide/2p_data_no_luminance_corr')
+preprocessed_data_path = Path('/ceph/imaging1/davide/2p_data_nb10')
 
 
 # SESSION TO PREPROCESS
-sessions = {'441394_ribolla':['20230301','20230306','20230307','20230308','20230309',
-                              '20230315','20230316','20230317','20230320','20230321'
-                              '20230323','20230324','20230328','20230330','20230331',
-                              '20230404','20230405','20230406','20230407','20230408',
-                              '20230411','20230412','20230413','20230414'],
-            
-            '441406_fiano': ['20230301','20230306','20230307','20230308','20230309',
-                              '20230315','20230316','20230317','20230320','20230321'
-                              '20230323','20230324','20230328','20230330','20230331',
-                              '20230404','20230405','20230406','20230407','20230408',
-                              '20230411','20230412','20230413','20230414']
+# 
+sessions = {'429420_toms': ['20221208', '20221003', '20221014', '20230213', '20230210', '20221130', 
+                            '20220928', '20230201', '20221117', '20230203', '20221205', '20230211', 
+                            '20230214', '20221207', '20221206', '20221209','20221210', '20221118', 
+                            '20221026', '20221202', '20230202', '20221122', '20221201', '20221027', 
+                            '20221115', '20221030']
            }
 
 # PREPROCESSING STEPS
-preprocess_vr_data = False
+preprocess_vr_data = True
 preprocess_2p_video = True
 
 
@@ -69,9 +65,10 @@ for animal in sessions.keys():
             try:
                 vr_data = lr.preprocess_vr_data(tif_file = tif_file, log_file=log_file)
                 lr.save_processed_vr_data(output_path,vr_data)
-            except:
-                print(f'Error in session {animal}_{date}, skipping ...')
-                continue
+            except Exception as e:
+                print(f'Error in VR data for session {animal}/{date}')
+                print(e)
+                print('skipping ...')
         
         #Run caiman pipeline 
         if preprocess_2p_video:
@@ -85,9 +82,14 @@ for animal in sessions.keys():
                                 output_folder=output_path,
                                 parameters=parameters,
                                 temp_folder=temp_path)
-            except:
-                print(f'Error in session {animal}_{date}, 2p preprocessing skipping ...')
-                continue
+            
+            except Exception as e:
+                print(f'Error in neural data for session {animal}/{date}')
+                print(e)
+                print(f'Cleaning temporary output directory: {str(temp_path)}')
+                shutil.rmtree(str(temp_path))
+                
+                print('skipping ...')
         
         
         
