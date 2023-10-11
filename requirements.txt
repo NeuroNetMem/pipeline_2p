@@ -8,4 +8,5 @@ poetry-plugin-export==1.4.0
 scanimage-tiff-reader==1.4.1
 scipy==1.10.1
 seaborn==0.12.2
+sidecar==0.7.0
 
