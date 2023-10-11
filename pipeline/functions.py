@@ -292,6 +292,11 @@ def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_fo
     movie = cm.load(input_video)
     movie = crop_movie(movie,cropping_params=cropping_params)   
     
+    # shift movie to ensure positivity
+    movie = movie - np.min(movie) + 1.
+    
+    print(f'Minimum of shifted movie = {np.min(movie)}')
+    
     if compute_flags['correct_luminance']:
         print('Correcting luminance fluctuations')
         movie = correct_avg_fluctuations(movie)
@@ -413,9 +418,9 @@ def preprocess_video(input_video=None,output_folder=None,parameters=None,temp_fo
     frame_ts = lr.extract_frame_timestamps(input_video)
     save_preprocessed_data(cnmf_destination_file,output_folder,frame_ts=frame_ts)
     
-    
-    print(f'Cleaning temporary output directory: {str(temp_folder)}')
-    shutil.rmtree(str(temp_folder))
+    if not keep_temp_folder:
+        print(f'Cleaning temporary output directory: {str(temp_folder)}')
+        shutil.rmtree(str(temp_folder))
         
 
     print('Done')    
